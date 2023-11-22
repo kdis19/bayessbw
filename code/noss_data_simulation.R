@@ -7,7 +7,8 @@ stages <- paste0('L', 2:6)
 ##### Prior Sampling #####
 prior.samp <- function(chains) {
   l <- lapply(1:chains, function(x) {
-    tl <- exp(rnorm(1, 5.64, 0.0067))
+    #tl <- exp(rnorm(1, 5.64, 0.0067))
+    tl <- exp(rnorm(1, 5.67, 0.01))
     tdiff <- rgamma(1, 112, scale = 0.226) 
     th <- tl + tdiff
     s_upsilon <- exp(rnorm(5, -2.5, 0.05))
@@ -22,12 +23,24 @@ prior.samp <- function(chains) {
       'HH' = rgamma(1, 7.6, scale = 3.12),
       's_eps' = exp(rnorm(5, -1.5, 0.1)),
       's_upsilon' = s_upsilon,
+      #'upsilon' = rlnorm(35, 0, rep(s_upsilon, each = 7)),
       'upsilon' = exp(rnorm(35, 0, rep(s_upsilon, 7)))
     )
     return(lst)
   })
+  # wvec <- sapply(l, function(x) {
+  #   row <- as.data.frame(x)[3,]
+  #   row$rho25 <- row$rho
+  #   gc <- get_curves(row, temp = c(0, 40))
+  #   probs <- dexp(gc$rate, rate = 20)
+  # })
+  # wt2 <- apply(wvec, 1, function(x) {x/sum(x)})
+  # wt <- apply(wt2, 1, prod)
+  # wt.st <- wt/sum(wt)
+  # samp <- sample(1:length(wt.st), size = chains, replace = TRUE, prob = wt.st)
   return(l)
 }
+#ps <- prior.samp(1000)
 
 ##### Data Generation #####
 on.add <- subset(all.days.df, province == 'ON' & transfer)
@@ -35,7 +48,6 @@ on.add$time1 <- round(on.add$time1)
 treat.times <- aggregate(data = on.add, time1 ~ temp1 + stage, 
                          function(x) {which.max(tabulate(x))})
 
-## Individual progress for a given set of parameters
 ind.progress <- function(param.df, dev.df) {
   sustainable <- ifelse(dev.df$treatment[1] == dev.df$sustainable[1], TRUE, FALSE)
   days <- vector()
@@ -99,7 +111,6 @@ ind.progress <- function(param.df, dev.df) {
   
 }
 
-## Calculate development rates from given set of parameters
 pop.dev <- function(t.treat, param.df, size = 250) {
   if (t.treat %in% c(5, 10, 30, 35)) {all.temps <- c('treatment' = t.treat, 'sustainable' = 20)}
   else {all.temps <- c('treatment' = t.treat, 'sustainable' = t.treat)}
@@ -131,10 +142,11 @@ pop.dev <- function(t.treat, param.df, size = 250) {
   nms <- c('treatment', 'sustainable', 'stage', 'time.treatment', 'time.sustainable', 'nobs')
   df <- df[,nms]
   df$cup <- rep(1:size, each = 5)
+  #ag <- aggregate(data = df, nobs ~ ., sum)
+  #return(ag)
   return(df)
 }
 
-## Wrapper function to generate populations
 gen.pops <- function(N, ps = NULL) {
   if (is.null(ps)) {
     ps <- prior.samp(N)
@@ -142,10 +154,15 @@ gen.pops <- function(N, ps = NULL) {
   else {N <- length(ps)}
   lst <- lapply(1:N, function(i) {
     p <- ps[[i]]
+    p$rho <- rep(p$rho, each = 7)
+    p$s_eps <- rep(p$s_eps, each = 7)
+    p$s_upsilon <- rep(p$s_upsilon, each = 7)
+    
     pdf <- as.data.frame(p)
-    pdf$stage <- rep(stages, 7)
-    pdf$temp <- rep(seq(5, 35, by = 5), each = 5)
+    pdf$stage <- rep(stages, each = 7)
+    pdf$temp <- rep(seq(5, 35, by = 5), 5)
     t.lst <- lapply(seq(5, 35, by = 5), function(tmp) {
+      #psub <- subset(pdf, temp == tmp)
       pdat <- pop.dev(tmp, pdf)
     })
     pd <- bind_rows(t.lst)
