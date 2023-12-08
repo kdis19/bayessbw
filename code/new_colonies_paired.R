@@ -35,8 +35,8 @@ set.seed(123)
 provs <- unique(all.days.df$province)
 stages <- unique(all.days.df$stage)
 
-model.run <- function(provs, parm.lst = pl, parms = parms.init) {
-  all.data <- subset(all.days.df, province %in% provs)
+model.run <- function(prvs, parm.lst = pl, parms = parms.init) {
+  all.data <- subset(all.days.df, province %in% prvs)
   all.data$block <- paste(all.data$stage, all.data$temp1, sep = '_')
   lev.ord <- paste(rep(stages, each = 7), rep(seq(5, 35, by = 5), 5), sep = '_')
   all.data$block <- factor(all.data$block)
@@ -103,7 +103,7 @@ model.run <- function(provs, parm.lst = pl, parms = parms.init) {
   stan1 <- tmbstan(ff, init = parm.lst, silent = TRUE, 
                    chains = chains, iter = 1500, warmup = 750,
                    control = list(max_treedepth = 15, adapt_delta = 0.99))
-  p.write <- paste(provs, collapse = '_')
+  p.write <- paste(prvs, collapse = '_')
   write.csv(as.data.frame(stan1), paste0('code/output/', p.write, '_post.csv'), row.names = FALSE)
   
   stan.array <- as.array(stan1)
@@ -133,8 +133,7 @@ for (p in provs) {
   if (length(pr.vec) == 0) {break}
   for (p2 in pr.vec) {
     ### UNCOMMENT TO RUN ALL PAIRED MODELS ###
-    # if (p %in% c('ON', 'IPU') & p2 %in% c('ON', 'IPU')) {next}
-    # mod.run <- model.run(provs = c(p, p2))
+    # mod.run <- model.run(prvs = c(p, p2))
     # stan.lst <- append(stan.lst, list(mod.run))
     # names(stan.lst)[length(stan.lst)] <- paste0(p, '_', p2)
     combo.vec <- c(combo.vec, paste0(p, '_', p2))
