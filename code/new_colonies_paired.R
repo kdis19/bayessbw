@@ -22,8 +22,8 @@ parms.init <- list(
   'HL' = 8.4,
   'HH' = 9.3,
   'HA' = 1.4, 
-  'TL' = 285.90432,
-  'TH' = 306.47530,
+  'TL' = 284,
+  'TH' = 304,
   's_eps' = rep(0.3, 5),
   's_upsilon' = rep(0.08, 5))
 parms1 <- parms.init

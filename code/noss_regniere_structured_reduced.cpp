@@ -93,7 +93,7 @@ px[0] = DW * py[0];
     Type epsij_std;
     Type c_upsilon1;
     Type c_upsilon2;
-    Type tdiff;
+    //Type tdiff;
     
     // Loop over observations
     for (int i=0; i<time1.size(); i++) {
@@ -135,25 +135,27 @@ px[0] = DW * py[0];
       
     }
     
-    Type r40 = 1/calc_pred(Type(40), rho(2), HA, TL, -HL, TH, HH, TA);
+    //Type r40 = 1/calc_pred(Type(40), rho(2), HA, TL, -HL, TH, HH, TA);
     
     // Subtract prior probabilities
     if (use_prior == 1) {
-      tdiff = TH - TL;
+      //tdiff = TH - TL;
       jnll -= sum(dnorm(upsilon, Type(0), Type(1), 1));
       
       for (int j=0; j<k_vec.size(); j++) {
         jnll -= dgamma(rho(j), k_vec(j), Type(0.045), 1);
       }
       
-      jnll -= dexp(r40, Type(40), 1);
+      //jnll -= dexp(r40, Type(40), 1);
       
       jnll -= dgamma(HL, Type(3.6), Type(2.253), 1);
       jnll -= dgamma(HA, Type(5.4), Type(0.134), 1);
       jnll -= dgamma(HH, Type(7.6), Type(3.12), 1);
       
-      jnll -= dnorm(log(TL), Type(5.64), Type(0.0067), 1);
-      jnll -= dgamma(tdiff, Type(112), Type(0.226), 1);
+      //jnll -= dnorm(log(TL), Type(5.64), Type(0.0067), 1);
+      //jnll -= dgamma(tdiff, Type(112), Type(0.226), 1);
+      jnll -= dnorm(TL, Type(284), Type(2), 1);
+      jnll -= dnorm(TH, Type(304), Type(2), 1);
       
       jnll -= sum(dnorm(log(s_eps), Type(-1.5), Type(0.1), 1));
       jnll -= sum(dnorm(log(s_upsilon), Type(-2.5), Type(0.05), 1));
