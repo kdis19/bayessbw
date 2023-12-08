@@ -148,19 +148,29 @@ pop.dev <- function(t.treat, param.df, size = 250) {
 }
 
 gen.pops <- function(N, ps = NULL) {
-  if (is.null(ps)) {
-    ps <- prior.samp(N)
-  }
-  else {N <- length(ps)}
+  if (!is.null(ps))  {N <- length(unique(ps$index))}
   lst <- lapply(1:N, function(i) {
-    p <- ps[[i]]
-    p$rho <- rep(p$rho, each = 7)
-    p$s_eps <- rep(p$s_eps, each = 7)
-    p$s_upsilon <- rep(p$s_upsilon, each = 7)
-    
-    pdf <- as.data.frame(p)
-    pdf$stage <- rep(stages, each = 7)
-    pdf$temp <- rep(seq(5, 35, by = 5), 5)
+    if (is.null(ps)) {
+      p <- prior.samp(1)[[1]]
+      p$rho <- rep(p$rho, each = 7)
+      p$s_eps <- rep(p$s_eps, each = 7)
+      p$s_upsilon <- rep(p$s_upsilon, each = 7)
+      
+      pdf <- as.data.frame(p)
+      pdf$stage <- rep(stages, each = 7)
+      pdf$temp <- rep(seq(5, 35, by = 5), 5)
+    }
+    else {
+      sub <- subset(ps, index == unique(ps$index)[i])
+      m.sub <- melt(data = sub,
+                    id.vars = c('rho', 'HA', 'TL', 'HL', 'TH', 'HH', 's_eps', 
+                                's_upsilon', 'stage', 'index', 'province'), 
+                    value.name = 'upsilon')
+      pdf <- subset(m.sub, select = -c(variable, index, province))
+      pdf <- pdf[order(pdf$stage),]
+      pdf$temp <- rep(seq(5, 35, by = 5), 5)
+      pdf$upsilon <- exp(pdf$upsilon*pdf$s_upsilon)
+    }
     t.lst <- lapply(seq(5, 35, by = 5), function(tmp) {
       #psub <- subset(pdf, temp == tmp)
       pdat <- pop.dev(tmp, pdf)
@@ -170,4 +180,34 @@ gen.pops <- function(N, ps = NULL) {
     return(list('priors' = p, 'data' = pd))
   })
   return(lst)
+}
+
+adjust.gp <- function(gp.out) {
+  names(gp.out)[1:5] <- c('temp1', 'temp2', 'stagename', 'time1', 'time2')
+  gp.out$stage <- sapply(gp.out$stagename, function(x) {which(stages == x) - 1})
+  
+  gp.out$time1.orig <- gp.out$time1
+  gp.out$time2.orig <- gp.out$time2
+  
+  gp.out$l2 <- sapply(gp.out$stage, function(x) {ifelse(x == 'L2', 1, 0)})
+  gp.out$cur0 <- sapply(gp.out$time2.orig, function(x) {ifelse(x == 0, 1, 0)})
+  gp.out$prev0 <- c(0, gp.out$cur0[1:(nrow(gp.out) - 1)])
+  
+  gp.out$time1 <- gp.out$time1.orig + (1-gp.out$l2)*gp.out$prev0
+  gp.out$time2 <- gp.out$time2.orig + (1-gp.out$l2)*(1-gp.out$prev0)
+  gp.out$time1d <- gp.out$time1.orig - gp.out$cur0
+  gp.out$time2d <- gp.out$time2.orig - (1 - gp.out$cur0)
+  gp.out <- subset(gp.out, select = c(nobs, temp1, temp2, stage, time1, 
+                                  time2, time1d, time2d))
+  
+  ag.gp.out <- aggregate(data = gp.out, nobs ~ ., sum)
+  
+  ntreat <- length(unique(ag.gp.out$temp1))
+  ag.gp.out$t_block1 <- ag.gp.out$stage*ntreat + ag.gp.out$temp1/5 - 1
+  ag.gp.out$t_block2 <- ag.gp.out$stage*ntreat + ag.gp.out$temp2/5 - 1
+  
+  minval <- min(c(ag.gp.out$t_block1, ag.gp.out$t_block2)) 
+  ag.gp.out$t_block1 <- ag.gp.out$t_block1 - minval
+  ag.gp.out$t_block2 <- ag.gp.out$t_block2 - minval
+  return(ag.gp.out)
 }

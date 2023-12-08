@@ -61,7 +61,7 @@ px[0] = DW * py[0];
     DATA_IVECTOR(t_block1);
     DATA_IVECTOR(t_block2);
     DATA_VECTOR(k_vec);
-
+    
     DATA_VECTOR(time1);
     DATA_VECTOR(time2);
     DATA_VECTOR(temp1);
@@ -99,28 +99,28 @@ px[0] = DW * py[0];
     for (int i=0; i<time1.size(); i++) {
       
       TA = calc_TA(-HL, HH, TL, TH);
-
+      
       // Calculate dev times for both sustainable and lethal temps
       tpred1 = calc_pred(temp1(i), rho(stage(i)), HA, TL, -HL, TH, HH, TA);
       tpred2 = calc_pred(temp2(i), rho(stage(i)), HA, TL, -HL, TH, HH, TA);
-
+      
       c_upsilon1 = exp(upsilon(t_block1(i))*s_upsilon(stage(i)));
       c_upsilon2 = exp(upsilon(t_block2(i))*s_upsilon(stage(i)));
-
+      
       // Transform for bias reduction
       tpred1 *= c_upsilon1;
       tpred2 *= c_upsilon2;
-
+      
       // Calculate and standardize observed values of epsilon
       epsm1 = log(time1d(i)/tpred1 + time2d(i)/tpred2);
       epsij = log(time1(i)/tpred1 + time2(i)/tpred2);
-
+      
       epsm1_std = epsm1/s_eps(stage(i));
       epsij_std = epsij/s_eps(stage(i));
-
+      
       Type pnorm_ij = pnorm_log1(epsij_std);
       Type pnorm_m1 = pnorm_log1(epsm1_std);
-
+      
       Type timesum = time1d(i) + time2d(i);
       if (timesum == 0) {
         pnormdiff = pnorm_ij;
@@ -128,12 +128,14 @@ px[0] = DW * py[0];
       else {
         pnormdiff =  logspace_sub(pnorm_ij, pnorm_m1);
       }
-
+      
       // Subtract log prob times number of observations
       nlogp = nobs(i)*pnormdiff;
       jnll -= nlogp;
-
+      
     }
+    
+    Type r40 = 1/calc_pred(Type(40), rho(2), HA, TL, -HL, TH, HH, TA);
     
     // Subtract prior probabilities
     if (use_prior == 1) {
@@ -143,6 +145,8 @@ px[0] = DW * py[0];
       for (int j=0; j<k_vec.size(); j++) {
         jnll -= dgamma(rho(j), k_vec(j), Type(0.045), 1);
       }
+      
+      jnll -= dexp(r40, Type(40), 1);
       
       jnll -= dgamma(HL, Type(3.6), Type(2.253), 1);
       jnll -= dgamma(HA, Type(5.4), Type(0.134), 1);

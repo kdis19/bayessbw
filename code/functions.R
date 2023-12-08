@@ -41,7 +41,7 @@ get_curves <- function(data, temp = tempvec, spline = FALSE) {
       times <- times*c.ups
       rates <- 1/times
       if (length(temp) != length(temps)) {
-        i.spline <- interpSpline(temps, rates)
+        i.spline <- interpSpline(c(0, temps, 40), c(0, rates, 0))
         df <- as.data.frame(predict(i.spline, temp))
         names(df) <- c('temp', 'rate')
         df$rate <- pmax(df$rate, 0)
