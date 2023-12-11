@@ -34,14 +34,8 @@ set.seed(123)
 provs <- unique(all.days.df$province)
 stages <- unique(all.days.df$stage)
 
-provs <- c(provs, 'all')
 for (p in provs) {
-  if (p == 'all') {
-    all.data <- all.days.df
-    all.data <- aggregate(data = all.data, nobs ~ ., sum)
-  }
-  else {all.data <- subset(all.days.df, province == p)}
-  
+  all.data <- subset(all.days.df, province == p)
   all.data$block <- paste(all.data$stage, all.data$temp1, sep = '_')
   lev.ord <- paste(rep(stages, each = 7), rep(seq(5, 35, by = 5), 5), sep = '_')
   all.data$block <- factor(all.data$block)
