@@ -83,14 +83,21 @@ param.extract <- function(post) {
 }
 
 ## run on outputs of data.adjust and param.extract
-likelihood.fn <- function(data, param) {
+likelihood.fn <- function(data, param, prior = FALSE, reduce = TRUE, expand = TRUE) {
   dd2 <- as.list(data)
-  dd2$use_prior <- 1
+  dd2$use_prior <- ifelse(prior, 1, 0)
+
   sm1 <- 0:4
   dd2$k_vec <- -1.05*sm1^2 + 4.22*sm1 + 4.08
   
   nblock <- length(unique(dd2$stage))*length(unique(dd2$temp1))
   parms$upsilon <- rep(0, nblock)
+  
+  if (nblock == 30 & reduce) {
+    g <- grep('^upsilon', colnames(param))
+    w <- g[(0:4)*7 + 1]
+    param <- param[,-w]
+  }
   
   ff <- MakeADFun(data=dd2,
                   parameters=as.list(parms[param.nms]),
@@ -98,7 +105,20 @@ likelihood.fn <- function(data, param) {
                   silent=TRUE)
   
   lk <- sapply(1:nrow(param), function(x) {
-    ff$fn(param[x,])
+    px <- param[x,]
+    g <- grep('^upsilon', names(px))
+    if (expand & length(g) == 30) {
+      ups <- px[g]
+      ups.new <- vector()
+      for (i in 1:length(ups)) {
+        if ((i %% 6) == 1) {ups.new <- c(ups.new, 0)}
+        ups.new <- c(ups.new, ups[i])
+      }
+      names(ups.new) <- rep('upsilon', length(ups.new))
+      px <- px[-g]
+      px <- c(px, ups.new)
+    }
+    ff$fn(px)
   })
   #lk <- lk/(sum(dd2$nobs)/5)
   return(-lk)

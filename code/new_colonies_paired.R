@@ -146,33 +146,104 @@ post.lst <- lapply(provs, function(p) {
 })
 names(post.lst) <- provs
 
+ps.lst <- prior.samp(3000)
+ps.v.lst <- lapply(ps.lst, function(x) {
+  x <- x[param.nms]
+  s_ups <- rep(x$s_upsilon, each = 7)
+  vec <- unlist(lapply(1:length(x), function(i) {
+    vals <- x[[i]]
+    nm <- names(x)[i]
+    if (nm == 'upsilon') {
+      vals <- log(vals)/s_ups
+    }
+    names(vals) <- rep(nm, length(vals))
+    return(vals)
+  }))
+  return(vec)
+})
+ps.v.df <- do.call('rbind', ps.v.lst)
+ps.v.df[,'HL'] <- abs(ps.v.df[,'HL'])
+
+## input is a draw from prior.samp()
+prior.correct <- function(x) {
+  x <- x[param.nms]
+  x[['HL']] <- abs(x[['HL']])
+  s_ups <- rep(x$s_upsilon, each = 7)
+  vec <- unlist(lapply(1:length(x), function(i) {
+    vals <- x[[i]]
+    nm <- names(x)[i]
+    if (nm == 'upsilon') {
+      vals <- log(vals)/s_ups
+    }
+    names(vals) <- rep(nm, length(vals))
+    return(vals)
+  }))
+  return(vec)
+}
+get.prior <- function(N) {
+  prior.lst <- lapply(1:N, function(x) {
+    ps <- prior.samp(1)[[1]]
+    pc <- prior.correct(ps)
+    return(pc)
+  })
+  prior <- do.call('rbind', prior.lst)
+  return(prior)
+}
+
 lk.lst <- lapply(combo.vec, function(pvs) {
+  N <- 100000
   print(pvs)
   prov.vec <- strsplit(pvs, split = '_')[[1]]
   p1 <- prov.vec[1]
   p2 <- prov.vec[2]
+  
   m.data <- data.adjust(subset(all.days.df, province %in% prov.vec))
-  m.post <- param.extract(read.csv(paste0('code/output/', pvs, '_post.csv')))
+  #m.post <- param.extract(read.csv(paste0('code/output/', pvs, '_post.csv')))
+  m.prior <- get.prior(N)
   
   data1 <- data.adjust(subset(all.days.df, province == p1))
   data2 <- data.adjust(subset(all.days.df, province == p2))
-  post1 <- param.extract(post.lst[[p1]])
-  post2 <- param.extract(post.lst[[p2]])
-  post1 <- post1[1:pmin(nrow(post1), nrow(post2)),]
-  post2 <- post2[1:pmin(nrow(post1), nrow(post2)),]
+  prior1 <- get.prior(N/2)
+  prior2 <- get.prior(N/2)
   
-  m1.1.lk <- likelihood.fn(data1, post1)
-  m1.2.lk <- likelihood.fn(data2, post2)
-  m1.1.prior <- sapply(1:nrow(post1), function(x) {prior.eval(post1[x,])})
-  m1.2.prior <- sapply(1:nrow(post2), function(x) {prior.eval(post2[x,])})
-  m1.post <- m1.1.lk + m1.2.lk + m1.1.prior + m1.2.prior
+  m1.1.lk <- likelihood.fn(data1, prior1, expand = FALSE)
+  m1.2.lk <- likelihood.fn(data2, prior2, expand = FALSE)
+  m1.post <- m1.1.lk + m1.2.lk
   
-  m2.lk <- likelihood.fn(m.data, m.post)
-  m2.prior <- sapply(1:nrow(m.post), function(x) {prior.eval(m.post[x,])})
-  m2.post <- m2.lk + m2.prior
+  m2.lk <- likelihood.fn(m.data, m.prior)
+  m2.post <- m2.lk 
   
   df <- data.frame('pvs' = pvs,
                    'l.bayesFactor' = mean(m1.post) - mean(m2.post))
  
 })
 lk.df <- bind_rows(lk.lst)
+
+
+kl.lst <- lapply(combo.vec, function(pvs) {
+  print(pvs)
+  prov.vec <- strsplit(pvs, split = '_')[[1]]
+  p1 <- prov.vec[1]
+  p2 <- prov.vec[2]
+  
+  data1 <- data.adjust(subset(all.days.df, province == p1))
+  data2 <- data.adjust(subset(all.days.df, province == p2))
+  
+  post1 <- param.extract(post.lst[[p1]])
+  post2 <- param.extract(post.lst[[p2]])
+  
+  m.data <- data.adjust(subset(all.days.df, province %in% c(p1, p2)))
+  m.post <- param.extract(read.csv(paste0('code/output/', pvs, '_post.csv')))
+  
+  kl1 <- mean(likelihood.fn(data1, post1) - likelihood.fn(data2, post1))
+  kl2 <- mean(likelihood.fn(data2, post2) - likelihood.fn(data1, post2))
+  
+  js1 <- mean(likelihood.fn(data1, post1) - likelihood.fn(m.data, post1))
+  js2 <- mean(likelihood.fn(data2, post2) - likelihood.fn(m.data, post2))
+  
+  js <- mean(js1, js2)
+  
+  df <- data.frame('prov1' = p1, 'prov2' = p2, 
+                   'kl1' = kl1, 'kl2' = kl2, 'js' = js)
+  return(df)
+})

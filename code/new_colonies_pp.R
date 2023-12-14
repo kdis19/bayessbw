@@ -11,7 +11,7 @@ pnames <- c("rho",
 
 ##### Organize results #####
 process.standf <- function(province) {
-  data <- read.csv(paste0('code/output/forcerate/', province, '_post.csv'))
+  data <- read.csv(paste0('code/output/', province, '_post.csv'))
   data$HL <- -abs(data$HL)
   
   d.post.lst <- lapply(pnames, function(nm) {
