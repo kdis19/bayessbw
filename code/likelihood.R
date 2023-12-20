@@ -67,7 +67,7 @@ data.adjust <- function(data) {
 }
 
 ## run on posteriors in code/output folder
-param.extract <- function(post) {
+param.extract <- function(post, list = FALSE) {
   samp.lst <- lapply(1:nrow(post), function(samp) {
     sub <- post[samp,]
     par.lst <- lapply(param.nms, function(x) {
@@ -76,10 +76,65 @@ param.extract <- function(post) {
       names(vec) <- rep(x, length(vec))
       return(vec)
     })
-    return(unlist(par.lst))
+    if (list) {
+      names(par.lst) <- param.nms
+      return(par.lst)
+    }
+    else {
+      upl <- unlist(par.lst)
+      return(upl)
+    }
   })
-  samp.df <- do.call('rbind', samp.lst)
-  return(samp.df)
+  if (!list) {
+    samp.df <- do.call('rbind', samp.lst)
+    return(samp.df)
+  }
+  else {
+    return(samp.lst)
+  }
+}
+
+ind.lk <- function(data, param) {
+  llk <- with(param, {
+    stage <- data$stage + 1
+    t_block1 <- data$t_block1 + 1
+    t_block2 <- data$t_block2 + 1
+    
+    TA <- ta.fun(-HL, HH, TL, TH)
+    tpred1 <- calc_pred3(data$temp1, rho[stage], HA, TL, -HL, TH, HH, TA)
+    tpred2 <- calc_pred3(data$temp2, rho[stage], HA, TL, -HL, TH, HH, TA)
+    
+    c_ups1 <- exp(upsilon[t_block1]*s_upsilon[stage])
+    c_ups2 <- exp(upsilon[t_block2]*s_upsilon[stage])
+    
+    tpred1 <- tpred1*c_ups1
+    tpred2 <- tpred2*c_ups2
+    
+    epsm1 <- log(data$time1d/tpred1 + data$time2d/tpred2)
+    epsij <- log(data$time1/tpred1 + data$time2/tpred2)
+    
+    epsm1_std <- epsm1/s_eps[stage]
+    epsij_std <- epsij/s_eps[stage]
+    
+    pnorm_m1 <- pnorm(epsm1_std, log.p = TRUE)
+    pnorm_ij <- pnorm(epsij_std, log.p = TRUE)
+    
+    timesum <- data$time1d + data$time2d
+    
+    pnormdiff <- sapply(1:length(timesum), function(x) {
+      pij <- pnorm_ij[x]
+      pm1 <- pnorm_m1[x]
+      ifelse(x == 0, pij,
+             logspace.sub(pij, pm1))})
+    
+    lp.lst <- lapply(1:nrow(data), function(r) {
+      rep(pnormdiff[r], data$nobs[r])
+    })
+    nlogp <- unlist(lp.lst)
+    #nlogp <- data$nobs*pnormdiff
+    return(nlogp)
+  })
+  return(llk)
 }
 
 ## run on outputs of data.adjust and param.extract
