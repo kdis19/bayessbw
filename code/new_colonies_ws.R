@@ -12,6 +12,7 @@ weather$Temp <- round(weather$Temp, 1)
 weather$Temp <- pmin(pmax(weather$Temp, 0), 40)
 
 on.weather <- subset(weather, Location == 'ON' & Year == 2019)
+write.csv(on.weather, 'data/on_real_weather.csv', row.names = FALSE)
 
 # ag.gc <- read.csv('code/output/ag_devcurves.csv')
 # ag.gc <- subset(ag.gc, select = -c(low, high))
@@ -59,6 +60,7 @@ dt.lst <- lapply(unique(mg$full.index), function(ind) {
   return(sub)
 })
 age.df <- bind_rows(dt.lst)
+write.csv(age.df, 'code/output/sim_age.csv')
 
 ##### Compare pupal dates #####
 p.lst <- lapply(unique(age.df$full.index), function(ind) {
