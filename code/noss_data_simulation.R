@@ -149,7 +149,7 @@ pop.dev <- function(t.treat, param.df, size = 250) {
   return(df)
 }
 
-gen.pops <- function(N, ps = NULL) {
+gen.pops <- function(N, ps = NULL, rename = FALSE, individuals = 250) {
   if (!is.null(ps))  {N <- length(unique(ps$index))}
   lst <- lapply(1:N, function(i) {
     if (is.null(ps)) {
@@ -172,13 +172,18 @@ gen.pops <- function(N, ps = NULL) {
       pdf <- pdf[order(pdf$stage),]
       pdf$temp <- rep(seq(5, 35, by = 5), 5)
       pdf$upsilon <- exp(pdf$upsilon*pdf$s_upsilon)
+      p <- ps
     }
     t.lst <- lapply(seq(5, 35, by = 5), function(tmp) {
       #psub <- subset(pdf, temp == tmp)
-      pdat <- pop.dev(tmp, pdf)
+      pdat <- pop.dev(tmp, pdf, size = individuals)
     })
     pd <- bind_rows(t.lst)
     pd$prior.samp <- i
+    if (rename) {
+      names(pd) <- c('temp1', 'temp2', 'stage', 'time1',
+                     'time2', 'nobs', 'cup', 'prior.samp')
+    }
     return(list('priors' = p, 'data' = pd))
   })
   return(lst)
