@@ -1,5 +1,6 @@
 library(tidyverse)
 library(GGally)
+library(lubridate)
 source('code/likelihood.R')
 
 prov.ord <- c('IN', 'AB', 'ON', 'QC', 'NB2', 'IPU')
@@ -22,26 +23,46 @@ tdiff <- qgamma(0.5, 112, scale = 0.226)
 tl <- exp(5.67)
 sm1 <- 0:4
 k <- -1.05*sm1^2 + 4.22*sm1 + 4.08
-params <- list('HA' = qgamma(0.5, 5.4, scale = 0.134),
-               'HL' = -qgamma(0.5, 3.6, scale = 2.253),
-               'HH' = qgamma(0.5, 7.6, scale = 3.12),
-               'TL' = tl,
-               'TH' = tl + tdiff,
-               'rho' = qgamma(0.5, median(k), scale = 0.045))
-gc <- get_curves(as.data.frame(params))
+qs <- seq(0.1, 0.9, by = 0.1)
+params.orig <- list('HA' = qgamma(qs, 5.4, scale = 0.134),
+                    'HL' = -qgamma(qs, 3.6, scale = 2.253),
+                    'HH' = qgamma(qs, 7.6, scale = 3.12),
+                    'TL' = qnorm(qs, 284, 2),
+                    'TH' = qnorm(qs, 304, 2),
+                    'rho' = qgamma(qs, median(k), scale = 0.045))
+gc <- get_curves(as.data.frame(params.orig))
 
-tdiff <- qgamma(0.5, 112, scale = 0.226)
-tl <- exp(5.67)
-sm1 <- 0:4
-k <- -1.05*sm1^2 + 4.22*sm1 + 4.08
-params <- list('HA' = qgamma(0.5, 5.4, scale = 0.134),
-               'HL' = -qgamma(0.5, 4, scale = 2),
-               'HH' = qgamma(0.5, 5, scale = 0.5),
-               'TL' = tl,
-               'TH' = tl + tdiff,
-               'rho' = qgamma(0.5, median(k), scale = 0.045))
-gc <- get_curves(as.data.frame(params))
+gc.lst <- lapply(names(params.orig), function(par) {
+  params <- lapply(names(params.orig), function(p2) {
+    if (p2 == par) {
+      return(params.orig[[p2]])
+    }
+    else {
+      return(params.orig[[p2]][5])
+    }
+  })
+  names(params) <- names(params.orig)
+  df <- as.data.frame(params)
+  gc <- get_curves(df)
+  gc$parameter <- par
+  gc$quantile <- qs[gc.ha$index]
+  return(gc)
+})
+gc.df <- bind_rows(gc.lst)
+gc.df$parameter <- factor(gc.df$parameter,
+                          labels = c('H[A]', 'H[H]', 'H[L]', 
+                                     'rho[L4]', 'T[H]', 'T[L]'))
 
+ggplot(data = gc.df) +
+  geom_line(aes(x = temp, y = rate, group = index, 
+                col = quantile), linewidth = 1.5) +
+  facet_wrap(vars(parameter), labeller = 'label_parsed') +
+  theme_minimal() +
+  labs(x = expression('Input Temperature ' (degree~C)),
+       y = 'Development Rate', col = 'Quantile of Prior') +
+  theme(strip.text = element_text(face = 'bold', size = 14),
+        axis.title = element_text(size = 14),
+        legend.title = element_text(size = 13, hjust = 0.5))
 
 ##### Figure 4 #####
 ## Violin plots of model predictions vs observations ##
@@ -69,7 +90,7 @@ ggplot(data = dg.df) +
   scale_fill_manual(values = cbPalette) +
   scale_color_manual(values = cbPalette) +
   guides(fill = 'none', col = 'none') +
-  labs(size = '# of Obs', y = 'Degree Days',
+  labs(size = '# of Obs', y = expression('Degree Days ' (degree~C)),
        x = expression('Rearing Temperature ' (degree~C))) +
   theme_minimal() +
   theme(strip.text = element_text(face = 'bold', size = 14),
@@ -77,18 +98,52 @@ ggplot(data = dg.df) +
         legend.title = element_text(size = 13))
 
 ##### Figure 5 #####
+prov.comp.df.all <- read.csv('code/output/cv/prov_compare.csv')
+prov.df.ag <- read.csv('code/output/cv/prov_individual.csv')
+
+prov.comp.df.all$prov <- factor(prov.comp.df.all$prov, levels = prov.ord)
+prov.comp.df.all$post.prov <- factor(prov.comp.df.all$post.prov, 
+                                     levels = prov.ord)
+
+prov.df.ag$prov <- factor(prov.df.ag$prov, levels = prov.ord)
+
+ggplot(data = prov.comp.df.all) +
+  geom_hline(data = prov.df.ag, aes(yintercept = elpd, col = prov)) +
+  geom_boxplot(aes(x = post.prov, y = elpd, col = post.prov)) +
+  scale_color_manual(values = cbPalette) +
+  guides(col = 'none') +
+  facet_wrap(vars(prov)) +
+  theme_minimal()
+
 ##### Figure 6 #####
+cps <- c('HA', 'TL', 'HL', 'TH', 'HH')
+ps.lst <- lapply(prior.samp(3000), function(ps) {
+  as.data.frame(ps[cps])
+})
+ps.df <- bind_rows(ps.lst)
+ps.df$province <- 'Prior'
+
 c.post.l2 <- subset(c.post, stage == 'L2',
                     select = c('HA', 'TL', 'HL', 'TH', 'HH', 'province'))
-c.post.l2$province <- factor(c.post.l2$province, levels = prov.ord)
+
+c.post.l2 <- bind_rows(ps.df, c.post.l2)
+c.post.l2$province <- factor(c.post.l2$province, levels = c('Prior', prov.ord))
+names(c.post.l2) <- c('H[A]', 'T[L]', 'H[L]', 'T[H]', 'H[H]', 'province')
+
 ggpairs(data = c.post.l2, columns = 1:5, 
         # upper = list(continuous = 'blank'),
-        upper = list(continuous = 'points'),
-        aes(fill = province, colour = province, alpha = 0.4)) +
-  scale_fill_manual(values = cbPalette) +
-  scale_colour_manual(values = cbPalette) +
+        upper = list(continuous = wrap('points')),
+        diag = list(continuous = wrap('densityDiag', alpha = 0.5)),
+        lower = list(continuous = wrap('points')),
+        labeller = 'label_parsed',
+        legend = c(1, 1),
+        aes(fill = province, colour = province)) +
+  scale_fill_manual(values = c('black', cbPalette)) +
+  scale_colour_manual(values = c('black',cbPalette)) +
   theme_minimal() +
-  theme(strip.text = element_text(face = 'bold', size = 14))
+  theme(strip.text = element_text(face = 'bold', size = 14),
+        legend.position = 'right') +
+  labs(fill = 'Colony', col = 'Colony')
 
 
 ##### Figure 7 #####
@@ -96,7 +151,7 @@ vars <- c('rho', 's_eps')
 vmap <- c('rho', 'sigma[epsilon]')
 c.post.sw <- subset(c.post, select = c(vars, 'stage', 'province'))
 cp.sw.ag.mat <- aggregate(data = c.post.sw, cbind(rho, s_eps) ~ ., 
-                      function(x) {quantile(x, probs = c(0.05, 0.5, 0.95))})
+                          function(x) {quantile(x, probs = c(0.05, 0.5, 0.95))})
 
 inds <- cp.sw.ag.mat[,c('stage', 'province')]
 
@@ -131,5 +186,13 @@ ggplot(data = cp.sw.ag) +
         axis.title = element_text(size = 14),
         legend.title = element_text(size = 13))
 
+##### Figure 8 #####
+on.weather <- read.csv('data/on_real_weather.csv')
+on.weather$DATE <- as.Date(on.weather$DATE)
+on.weather$datetime <- on.weather$DATE + hours(on.weather$Hour)
+daily <- aggregate(data = on.weather, Temp.orig ~ DATE, mean)
+daily$DATE <- as.POSIXct(daily$DATE)
+
+pdates <- read.csv('code/output/pupal_dates.csv')
 
 
