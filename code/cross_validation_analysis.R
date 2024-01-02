@@ -54,41 +54,50 @@ prov.df <- data.frame('post.prov' = rep(provs, each = 10),
 prov.df.ag <- aggregate(data = prov.df, elpd ~ prov + post.prov, mean)
 write.csv(prov.df.ag, 'code/output/cv/prov_individual.csv', row.names = FALSE)
 
+col.post.lst <- lapply(provs, function(x) {
+  read.csv(paste0('code/output/', p, '_post.csv'))
+})
+names(col.post.lst) <- provs
+
 prov.comp.lst <- lapply(provs, function(p) {
   print(p)
-  dat <- subset(all.days.df, province == p)
-  wp <- grep(p, post.files)
-  pf.vec <- post.files[-wp]
-  post.lst <- lapply(pf.vec, function(y) {
-    st.vec <- strsplit(y, split = '_')[[1]][1:2]
-    print(paste(st.vec, collapse = '_'))
-    post <- read.csv(paste0('code/output/cv/', y))
-    adj.data <- data.adjust(dat)
+  dat <- subset(group.df, province == p)
+  # wp <- grep(p, post.files)
+  # pf.vec <- post.files[-wp]
+  pprov.lst <- lapply(provs, function(p2) {
+    post <- col.post.lst[[p2]]
     pe.post <- param.extract(post, list = TRUE)
-    lk.vec <- sapply(pe.post, function(pe) {
-      if (st.vec[1] == 'AB') {
-        ups <- pe$upsilon
-        ups.new <- vector()
-        for (i in 1:length(ups)) {
-          if ((i %% 6) == 1) {ups.new <- c(ups.new, 0)}
-          ups.new <- c(ups.new, ups[i])
+    gp.lst <- lapply(1:10, function(g) {
+      print(paste(c(p, p2, gp), collapse = '_'))
+      dat2 <- subset(dat, group == g)
+      adj.data <- data.adjust(dat2)
+      lk.vec <- sapply(pe.post, function(pe) {
+        if (p2 == 'AB') {
+          ups <- pe$upsilon
+          ups.new <- vector()
+          for (i in 1:length(ups)) {
+            if ((i %% 6) == 1) {ups.new <- c(ups.new, 0)}
+            ups.new <- c(ups.new, ups[i])
+          }
+          names(ups.new) <- rep('upsilon', length(ups.new))
+          pe$upsilon <- ups.new
         }
-        names(ups.new) <- rep('upsilon', length(ups.new))
-        pe$upsilon <- ups.new
-      }
-      lk <- exp(ind.lk(adj.data, pe))
-      m <- mean(lk)
-      return(log(m))
+        lk <- exp(ind.lk(adj.data, pe))
+        m <- mean(lk)
+        return(log(m))
+      })
+      elpd.i <- log(mean(exp(lk.vec)))
+      df <- data.frame('dat.prov' = p,
+                       'post.prov' = p2,
+                       'group' = g,
+                       'elpd' = elpd.i)
+      return(df)
     })
-    elpd.i <- log(mean(exp(lk.vec)))
-    df <- data.frame('post.prov' = st.vec[1],
-                     'group' = st.vec[2],
-                     'elpd' = elpd.i)
-    return(df)
+    gp.df <- bind_rows(gp.lst)
+    return(gp.df)
   })
-  post.df <- bind_rows(post.lst)
-  post.df$prov <- p
-  return(post.df)
+  pprov.df <- bind_rows(pprov.lst)
+  return(pprov.df)
 })
 prov.comp.df <- bind_rows(prov.comp.lst)
 prov.comp.df.all <- rbind(prov.comp.df, prov.df)
