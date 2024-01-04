@@ -184,6 +184,8 @@ p.df$cup <- sapply(p.df$index, function(x) {
 
 ag.pdf <- aggregate(data = p.df, elpd ~ prov.orig + 
                       prov.comp + temp + cup, sum)
+write.csv(ag.pdf, 'code/output/cv/full_elpd.csv', row.names = FALSE)
+
 ag2.pdf <- aggregate(data = ag.pdf, elpd ~ prov.orig + 
                        prov.comp + temp, 
                      function(x) {
