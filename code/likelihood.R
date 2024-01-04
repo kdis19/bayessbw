@@ -29,7 +29,7 @@ parms <- list(
 
 
 ## run on subset of all.days.df
-data.adjust <- function(data) {
+data.adjust <- function(data, cup = FALSE) {
   w1 <- which(data$temp1 %in% c(15, 20, 25) & data$time2 == 0)
   data$time2[w1] <- 1
   w2 <- which(data$temp1 %in% c(5, 10, 30, 35) & data$time1 == 0)
@@ -46,15 +46,25 @@ data.adjust <- function(data) {
   data$time2 <- data$time2.orig + (1-data$l2)*(1-data$prev0)
   data$time1d <- data$time1.orig - data$cur0
   data$time2d <- data$time2.orig - (1 - data$cur0)
-  data <- subset(data, select = c(nobs, temp1, temp2, stage, time1, 
-                                          time2, time1d, time2d))
-  
-  dd <- data
-  dd$stagename <- dd$stage
-  dd$stage <- as.numeric(factor(dd$stage)) - 1
-  
-  dd2 <- with(dd, nList(temp1,time1,temp2,time2,time1d,time2d,stage,
-                        nobs=as.integer(nobs)))
+  if (!cup) {
+    data <- subset(data, select = c(nobs, temp1, temp2, stage, time1, 
+                                    time2, time1d, time2d))
+    dd <- data
+    dd$stagename <- dd$stage
+    dd$stage <- as.numeric(factor(dd$stage)) - 1
+    dd2 <- with(dd, nList(temp1,time1,temp2,time2,time1d,time2d,stage,
+                          nobs=as.integer(nobs)))
+  }
+  else {
+    data <- subset(data, select = c(nobs, temp1, temp2, stage, time1, 
+                                    time2, time1d, time2d, index))
+    dd <- data
+    dd$stagename <- dd$stage
+    dd$stage <- as.numeric(factor(dd$stage)) - 1
+    dd2 <- with(dd, nList(temp1,time1,temp2,time2,
+                          time1d,time2d,stage,index,
+                          nobs=as.integer(nobs)))
+  }
   ntreat <- length(unique(dd2$temp1))
   dd2$t_block1 <- dd2$stage*ntreat + dd2$temp1/5 - 1
   dd2$t_block2 <- dd2$stage*ntreat + dd2$temp2/5 - 1

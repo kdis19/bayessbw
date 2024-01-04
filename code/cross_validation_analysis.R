@@ -23,9 +23,10 @@ diag.df <- bind_rows(diag.lst)
 write.csv(diag.df, 'code/output/cv/diagnostics.csv', row.names = FALSE)
 
 ##### Evaluate elpd within colonies #####
-prov.lst <- lapply(provs, function(p) {
+prov.lst <- list()
+for (p in provs) {
   print(p)
-  gps <- sapply(1:10, function(x) {
+  gps.lst <- lapply(1:10, function(x) {
     print(x)
     data <- subset(group.df, run.index == paste0(p, '_', x))
     post <- read.csv(paste0('code/output/cv/', p, '_', x, '_post.csv'))
@@ -33,86 +34,165 @@ prov.lst <- lapply(provs, function(p) {
     adj.data <- data.adjust(data)
     pe.post <- param.extract(post, list = TRUE)
     
-    lk.vec <- sapply(pe.post, function(pe) {
-      lk <- exp(ind.lk(adj.data, pe))
-      m <- mean(lk)
-      return(log(m))
-    })
-    elpd.i <- log(mean(exp(lk.vec)))
+    llk.lst <- lapply(pe.post, function(pe) {ind.lk(adj.data, pe)})
+    llk.mat <- do.call('rbind', llk.lst)
+    lk.mat <- exp(llk.mat)
     
-    # lk <- likelihood.fn(data = adj.data, param = pe.post, 
-    #                     reduce = FALSE, expand = FALSE)
-    # elpd.i <- log(mean(exp(lk)))
-    return(elpd.i)
+    ind.vec <- apply(lk.mat, 2, function(x) {log(mean(x))})
+    
+    return(ind.vec)
   })
-  return(gps)
-})
-prov.df <- data.frame('post.prov' = rep(provs, each = 10),
-                      'group' = rep(1:10, length(provs)),
-                      'elpd' = unlist(prov.lst),
-                      'prov' = rep(provs, each = 10))
-prov.df.ag <- aggregate(data = prov.df, elpd ~ prov + post.prov, mean)
-write.csv(prov.df.ag, 'code/output/cv/prov_individual.csv', row.names = FALSE)
+  gps <- unlist(gps.lst)
+  prov.lst <- append(prov.lst, list(gps))
+}
+names(prov.lst) <- provs
+saveRDS(prov.lst, file = 'code/output/cv/prov_individual.rds')
 
 col.post.lst <- lapply(provs, function(x) {
-  read.csv(paste0('code/output/', p, '_post.csv'))
+  read.csv(paste0('code/output/', x, '_post.csv'))
 })
 names(col.post.lst) <- provs
 
-prov.comp.lst <- lapply(provs, function(p) {
-  print(p)
+prov.comp.lst <- list()
+pcl.names <- vector()
+comp.lst <- list()
+for (p in provs) {
   dat <- subset(group.df, province == p)
-  # wp <- grep(p, post.files)
-  # pf.vec <- post.files[-wp]
-  pprov.lst <- lapply(provs, function(p2) {
+  provs2 <- provs[provs != p]
+  for (p2 in provs2) {
+    nm <- paste(c(p, p2), collapse = '_')
+    pcl.names <- c(pcl.names, nm)
+    print(nm)
     post <- col.post.lst[[p2]]
     pe.post <- param.extract(post, list = TRUE)
-    gp.lst <- lapply(1:10, function(g) {
-      print(paste(c(p, p2, gp), collapse = '_'))
-      dat2 <- subset(dat, group == g)
-      adj.data <- data.adjust(dat2)
-      lk.vec <- sapply(pe.post, function(pe) {
-        if (p2 == 'AB') {
-          ups <- pe$upsilon
-          ups.new <- vector()
-          for (i in 1:length(ups)) {
-            if ((i %% 6) == 1) {ups.new <- c(ups.new, 0)}
-            ups.new <- c(ups.new, ups[i])
-          }
-          names(ups.new) <- rep('upsilon', length(ups.new))
-          pe$upsilon <- ups.new
-        }
-        lk <- exp(ind.lk(adj.data, pe))
-        m <- mean(lk)
-        return(log(m))
-      })
-      elpd.i <- log(mean(exp(lk.vec)))
-      df <- data.frame('dat.prov' = p,
-                       'post.prov' = p2,
-                       'group' = g,
-                       'elpd' = elpd.i)
-      return(df)
-    })
-    gp.df <- bind_rows(gp.lst)
-    return(gp.df)
-  })
-  pprov.df <- bind_rows(pprov.lst)
-  return(pprov.df)
-})
-prov.comp.df <- bind_rows(prov.comp.lst)
-prov.comp.df.all <- rbind(prov.comp.df, prov.df)
-
-write.csv(prov.comp.df.all, 'code/output/cv/prov_compare.csv', row.names = FALSE)
-
-pcdf.ag <- aggregate(data = prov.comp.df, elpd ~ prov + post.prov, mean)
-pcdf.all.ag <- rbind(pcdf.ag, prov.df.ag)
-
-lks <- lapply(1:length(post.files), function(x) {
-  ind <- names(post.files)[x]
-  data <- subset(group.df, run.index == ind)
-  files <- post.files[-x]
-  post.lst <- lapply(files, function(y) {
-    post <- read.csv(paste0('code/output/cv/', y))
     
-  })
+    adj.data <- data.adjust(dat)
+    llk.lst <- lapply(pe.post, function(pe) {
+      if (p2 == 'AB') {
+        ups <- pe$upsilon
+        ups.new <- vector()
+        for (i in 1:length(ups)) {
+          if ((i %% 6) == 1) {ups.new <- c(ups.new, 0)}
+          ups.new <- c(ups.new, ups[i])
+        }
+        names(ups.new) <- rep('upsilon', length(ups.new))
+        pe$upsilon <- ups.new
+      }
+      lk <- ind.lk(adj.data, pe)
+      return(lk)
+    })
+    llk.mat <- do.call('rbind', llk.lst)
+    lk.mat <- exp(llk.mat)
+    ind.vec <- apply(lk.mat, 2, function(x) {log(mean(x))})
+    
+    prov.comp.lst <- append(prov.comp.lst, list(ind.vec))
+    
+    iv.orig <- post.lst[[p]]
+    m.comp <- sum(iv.orig) - sum(ind.vec)
+    se.comp <- sqrt(length(ind.vec)*var(iv.orig - ind.vec))
+    df <- data.frame('prov.orig' = p,
+                     'prov.comp' = p2,
+                     'diff' = m.comp,
+                     'se.diff' = se.comp)
+    comp.lst <- append(comp.lst, list(df))
+  }
+}
+names(prov.comp.lst) <- pcl.names
+comp.df <- bind_rows(comp.lst)
+saveRDS(prov.comp.lst, file = 'code/output/cv/prov_compare.rds')
+#write.csv(comp.df, 'code/output/cv/prov_compare.csv', row.names = FALSE)
+
+##### Summarize #####
+s.prov.lst <- lapply(provs, function(p) {
+  x <- prov.lst[[p]]
+  mu <- mean(x)
+  sigma <- sd(x)
+  se <- sigma/sqrt(length(x))
+  return(data.frame('prov.orig' = p,
+                    'prov.comp' = p,
+                    'mean' = mu,
+                    'se' = se))
 })
+s.prov.df <- bind_rows(s.prov.lst)
+
+s.prov.comp.lst <- lapply(names(prov.comp.lst), function(nm) {
+  x <- prov.comp.lst[[nm]]
+  pvec <- strsplit(nm, split = '_')[[1]]
+  mu <- mean(x)
+  sigma <- sd(x)
+  se <- sigma/sqrt(length(x))
+  return(data.frame('prov.orig' = pvec[1],
+                    'prov.comp' = pvec[2],
+                    'mean' = mu,
+                    'se' = se))
+})
+s.prov.comp.df <- bind_rows(s.prov.comp.lst)
+
+s.all.df <- bind_rows(s.prov.df, s.prov.comp.df)
+write.csv(s.all.df, 'code/output/cv/s_col_compare.csv', row.names = FALSE)
+
+ad.lst <- lapply(provs, function(p) {
+  dat <- subset(group.df, province == p)
+  adj.data <- data.adjust(dat, cup = TRUE)
+  adj.data$province <- p
+  return(adj.data)
+})
+ad.df <- bind_rows(ad.lst)
+
+pl <- lapply(provs, function(p) {
+  #print(p)
+  x <- prov.lst[[p]]
+  g.lst <- lapply(1:10, function(g) {
+    #print(g)
+    sub <- subset(group.df, province == p & group == g)
+    da <- data.adjust(sub, cup = TRUE)
+    #print(nrow(sub) == nrow(da))
+    df <- data.frame('prov.orig' = p, 
+                     'prov.comp' = p,
+                     'stage' = stages[da$stage + 1], 
+                     'temp' = da$temp1,
+                     'index' = da$index)
+    return(df)
+  })
+  g.df <- bind_rows(g.lst)
+  g.df$elpd <- x
+  return(g.df)
+})
+pl.df <- bind_rows(pl)
+
+pcl <- lapply(names(prov.comp.lst), function(nm) {
+  #print(nm)
+  x <- prov.comp.lst[[nm]]
+  pvec <- strsplit(nm, split = '_')[[1]]
+  p1 <- pvec[1]
+  p2 <- pvec[2]
+  sub <- subset(ad.df, province == p1)
+  df <- data.frame('prov.orig' = p1, 
+                   'prov.comp' = p2,
+                   'elpd' = x,
+                   'stage' = stages[sub$stage + 1], 
+                   'temp' = sub$temp1,
+                   'index' = sub$index)
+  return(df)
+})
+pcl.df <- bind_rows(pcl)
+pcl.df <- pcl.df[,names(pl.df)]
+
+p.df <- bind_rows(pl.df, pcl.df)
+p.df$cup <- sapply(p.df$index, function(x) {
+  strsplit(x, split = '_')[[1]][3]})
+
+ag.pdf <- aggregate(data = p.df, elpd ~ prov.orig + 
+                      prov.comp + temp + cup, sum)
+ag2.pdf <- aggregate(data = ag.pdf, elpd ~ prov.orig + 
+                       prov.comp + temp, 
+                     function(x) {
+                         mu <- mean(x)
+                         se <- sd(x)/sqrt(length(x))
+                         return(c(mu, se))
+                       })
+elpd.df <- as.data.frame(ag2.pdf$elpd)
+names(elpd.df) <- c('mean', 'se')
+elpd.temp.df <- bind_cols(ag2.pdf[,1:3], elpd.df)
+write.csv(elpd.temp.df, 'code/output/cv/elpd_temp.csv', row.names = FALSE)
+

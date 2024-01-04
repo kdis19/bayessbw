@@ -3,7 +3,9 @@ library(GGally)
 library(lubridate)
 source('code/likelihood.R')
 
-prov.ord <- c('IN', 'AB', 'ON', 'QC', 'NB2', 'IPU')
+prov.ord <- c('IPU', 'IN', 'AB', 'ON', 'QC', 'NB2')
+prov.ord.lab <- c('Lab-Reared', 'Northwest Territories', 'Alberta', 
+                  'Ontario', 'Québec', 'New Brunswick')
 cbPalette <- c("#E69F00", "#56B4E9",  "#F0E442", "#009E73",
                "#0072B2", "#D55E00")
 
@@ -98,22 +100,51 @@ ggplot(data = dg.df) +
         legend.title = element_text(size = 13))
 
 ##### Figure 5 #####
-prov.comp.df.all <- read.csv('code/output/cv/prov_compare.csv')
-prov.df.ag <- read.csv('code/output/cv/prov_individual.csv')
+## Cross-Validation results ##
+s.all.df <- read.csv('code/output/cv/s_col_compare.csv')
+elpd.temp.df <- read.csv('code/output/cv/elpd_temp.csv')
 
-prov.comp.df.all$prov <- factor(prov.comp.df.all$prov, levels = prov.ord)
-prov.comp.df.all$post.prov <- factor(prov.comp.df.all$post.prov, 
-                                     levels = prov.ord)
+self.df <- subset(elpd.temp.df, prov.orig == prov.comp)
+s.prov.df <- subset(s.all.df, prov.comp == prov.orig)
 
-prov.df.ag$prov <- factor(prov.df.ag$prov, levels = prov.ord)
+s.all.df$prov.comp <- factor(s.all.df$prov.comp, levels = prov.ord)
+s.all.df$prov.orig <- factor(s.all.df$prov.orig, levels = prov.ord,
+                             labels = prov.ord.lab)
+s.prov.df$prov.orig <- factor(s.prov.df$prov.orig, levels = prov.ord,
+                              labels = prov.ord.lab)
 
-ggplot(data = prov.comp.df.all) +
-  geom_hline(data = prov.df.ag, aes(yintercept = elpd, col = prov)) +
-  geom_boxplot(aes(x = post.prov, y = elpd, col = post.prov)) +
+elpd.temp.df$prov.comp <- factor(elpd.temp.df$prov.comp, levels = prov.ord,
+                                 labels = prov.ord.lab)
+elpd.temp.df$prov.orig <- factor(elpd.temp.df$prov.orig, levels = prov.ord,
+                             labels = prov.ord.lab)
+self.df$prov.comp <- factor(self.df$prov.comp, levels = prov.ord,
+                                 labels = prov.ord.lab)
+self.df$prov.orig <- factor(self.df$prov.orig, levels = prov.ord,
+                              labels = prov.ord.lab)
+
+ggplot(data = s.all.df) +
+  geom_hline(data = s.prov.df, aes(yintercept = mean)) +
+  geom_point(aes(x = prov.comp, y = mean, col = prov.comp), size = 2) +
+  geom_segment(aes(x = prov.comp, xend = prov.comp, 
+                   y = mean - se, yend = mean + se,
+                   col = prov.comp)) +
+  facet_wrap(vars(prov.orig)) +
+  scale_y_continuous(trans = 'exp') +
   scale_color_manual(values = cbPalette) +
-  guides(col = 'none') +
-  facet_wrap(vars(prov)) +
-  theme_minimal()
+  theme_minimal() +
+  labs(x = 'Posterior Colony', y = 'Mean Individual ELPD') +
+  theme(legend.position = 'none', 
+        strip.text = element_text(size = 12, face = 'bold'),
+        axis.title = element_text(size = 14))
+
+ggplot(data = elpd.temp.df) +
+  geom_line(data = self.df, aes(x = temp, y = mean, col = prov.orig), show.legend = FALSE) +
+  geom_point(aes(x = temp, y = mean, col = prov.comp), size = 2) +
+  geom_segment(aes(x = temp, xend = temp, y = mean - se, yend = mean + se, col = prov.comp)) +
+  facet_wrap(vars(prov.orig)) +
+  scale_color_manual(values = cbPalette) +
+  theme_minimal() +
+  labs(x = 'Posterior Colony', y = 'Mean Individual ELPD', col = 'Data Colony') 
 
 ##### Figure 6 #####
 cps <- c('HA', 'TL', 'HL', 'TH', 'HH')

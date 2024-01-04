@@ -48,6 +48,7 @@ group.df$run.index <- paste0(group.df$province, '_', group.df$group)
 
 group.df$nobs <- 1
 group.df <- subset(group.df, select = -cup)
+
 ag.group.df <- aggregate(data = group.df, nobs ~ ., sum)
 write.csv(ag.group.df, 'data/all_data_grouped.csv', row.names = FALSE)
 
