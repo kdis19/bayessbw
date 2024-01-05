@@ -217,6 +217,33 @@ ggplot(data = cp.sw.ag) +
         axis.title = element_text(size = 14),
         legend.title = element_text(size = 13))
 
+par.lst <- lapply(provs, function(p) {
+  post <- read.csv(paste0('code/output/', p, '_post.csv'))
+  w <- which.max(post$`lp__`)
+  sub <- subset(c.post, province == p & index == w)
+  return(sub)
+})
+par.df <- bind_rows(par.lst)
+par.df2 <- subset(par.df,
+                  select = c(rho, HA, TL, HL, TH, HH, 
+                             province, stage))
+gc2 <- get_curves(par.df2)
+gc2$province <- sapply(gc2$index, function(x) {par.df2$province[x]})
+gc2$stage <- sapply(gc2$index, function(x) {par.df2$stage[x]})
+gc2$province <- factor(gc2$province, levels = prov.ord,
+                       labels = prov.ord.lab)
+
+ggplot(data = gc2) +
+  geom_line(aes(x = temp, y = rate, col = province), linewidth = 1.25) +
+  theme_minimal() +
+  scale_color_manual(values = cbPalette) +
+  facet_wrap(vars(stage)) +
+  labs(x = 'Rearing Temperature', y = 'Development Rate', col = 'Colony') +
+  theme(strip.text = element_text(size = 13),
+        legend.title = element_text(size = 13),
+        axis.title = element_text(size = 14),
+        legend.position = c(0.8, 0.28))
+
 ##### Figure 8 #####
 on.weather <- read.csv('data/on_real_weather.csv')
 on.weather$DATE <- as.Date(on.weather$DATE)
