@@ -18,6 +18,9 @@ dg.lst <- lapply(provs, function(p) {
   return(dat)
 })
 dg.df <- bind_rows(dg.lst)
+dg.df$province <- factor(dg.df$province, levels = prov.ord,
+                         labels = prov.ord.lab)
+dg.df$stage <- stages[dg.df$stage + 1]
 
 ##### Figure 3 #####
 ## Illustration of how parameters change curve shape ##
@@ -47,7 +50,7 @@ gc.lst <- lapply(names(params.orig), function(par) {
   df <- as.data.frame(params)
   gc <- get_curves(df)
   gc$parameter <- par
-  gc$quantile <- qs[gc.ha$index]
+  gc$quantile <- qs[gc$index]
   return(gc)
 })
 gc.df <- bind_rows(gc.lst)
@@ -77,25 +80,25 @@ a.data.lst <- lapply(provs, function(p) {
 })
 a.data <- bind_rows(a.data.lst)
 
-dg.df$province <- factor(dg.df$province, levels = prov.ord)
-a.data$province <- factor(a.data$province, levels = prov.ord)
-
-dg.df$stage <- stages[dg.df$stage + 1]
+a.data$province <- factor(a.data$province, levels = prov.ord,
+                          labels = prov.ord.lab)
 a.data$stage <- stages[a.data$stage + 1]
+
 ggplot(data = dg.df) +
   geom_violin(aes(x = factor(temp1), y = dd, weight = nobs,
                   fill = province, col = province)) +
   geom_point(data = a.data, 
              aes(x = factor(temp1), y = dd, size = nobs), 
              alpha = 0.3) +
-  facet_grid(rows = vars(province), cols = vars(stage), scales = 'free') +
+  facet_grid(cols = vars(province), rows = vars(stage), scales = 'free') +
   scale_fill_manual(values = cbPalette) +
   scale_color_manual(values = cbPalette) +
   guides(fill = 'none', col = 'none') +
   labs(size = '# of Obs', y = expression('Degree Days ' (degree~C)),
        x = expression('Rearing Temperature ' (degree~C))) +
   theme_minimal() +
-  theme(strip.text = element_text(face = 'bold', size = 14),
+  theme(strip.text.x = element_text(size = 10),
+        strip.text.y = element_text(size = 12),
         axis.title = element_text(size = 14),
         legend.title = element_text(size = 13))
 
@@ -124,7 +127,7 @@ self.df$prov.orig <- factor(self.df$prov.orig, levels = prov.ord,
 
 ggplot(data = s.all.df) +
   geom_hline(data = s.prov.df, aes(yintercept = mean)) +
-  geom_point(aes(x = prov.comp, y = mean, col = prov.comp), size = 2) +
+  geom_point(aes(x = prov.comp, y = mean, col = prov.comp), size = 3) +
   geom_segment(aes(x = prov.comp, xend = prov.comp, 
                    y = mean - se, yend = mean + se,
                    col = prov.comp)) +
@@ -134,7 +137,7 @@ ggplot(data = s.all.df) +
   theme_minimal() +
   labs(x = 'Posterior Colony', y = 'Mean Individual ELPD') +
   theme(legend.position = 'none', 
-        strip.text = element_text(size = 12, face = 'bold'),
+        strip.text = element_text(size = 13),
         axis.title = element_text(size = 14))
 
 ggplot(data = elpd.temp.df) +
@@ -252,5 +255,22 @@ daily <- aggregate(data = on.weather, Temp.orig ~ DATE, mean)
 daily$DATE <- as.POSIXct(daily$DATE)
 
 pdates <- read.csv('code/output/pupal_dates.csv')
+pdates$province <- factor(pdates$province, levels = prov.ord,
+                          labels = prov.ord.lab)
+
+ggplot(data = pdates) +
+  geom_boxplot(aes(x = province, y = days(pup.jd) + as.Date('2018-12-31'), 
+                   fill = province, col = province), 
+               alpha = 0.5, linewidth = 1.5, size = 2) +
+  labs(x = 'Colony', y = 'Estimated Date of Pupation') +
+  theme_minimal() +
+  theme(legend.position = 'none',
+        axis.title = element_text(size = 14),
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 12, angle = 12)) +
+  scale_color_manual(values = cbPalette) +
+  scale_fill_manual(values = cbPalette)
+  
+  
 
 
