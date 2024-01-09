@@ -6,6 +6,7 @@ source('code/likelihood.R')
 prov.ord <- c('IPU', 'IN', 'AB', 'ON', 'QC', 'NB2')
 prov.ord.lab <- c('Lab-Reared', 'Northwest Territories', 'Alberta', 
                   'Ontario', 'Québec', 'New Brunswick')
+prov.ord.lab.short <- c('IPU', 'NWT', 'AB', 'ON', 'QC', 'NB')
 cbPalette <- c("#E69F00", "#56B4E9",  "#F0E442", "#009E73",
                "#0072B2", "#D55E00")
 
@@ -110,9 +111,13 @@ elpd.temp.df <- read.csv('code/output/cv/elpd_temp.csv')
 self.df <- subset(elpd.temp.df, prov.orig == prov.comp)
 s.prov.df <- subset(s.all.df, prov.comp == prov.orig)
 
-s.all.df$prov.comp <- factor(s.all.df$prov.comp, levels = prov.ord)
+s.all.df$prov.comp <- factor(s.all.df$prov.comp, levels = prov.ord,
+                             labels = prov.ord.lab.short)
 s.all.df$prov.orig <- factor(s.all.df$prov.orig, levels = prov.ord,
                              labels = prov.ord.lab)
+
+s.prov.df$prov.comp <- factor(s.prov.df$prov.comp, levels = prov.ord,
+                              labels = prov.ord.lab.short)
 s.prov.df$prov.orig <- factor(s.prov.df$prov.orig, levels = prov.ord,
                               labels = prov.ord.lab)
 
@@ -147,7 +152,10 @@ ggplot(data = elpd.temp.df) +
   facet_wrap(vars(prov.orig)) +
   scale_color_manual(values = cbPalette) +
   theme_minimal() +
-  labs(x = 'Posterior Colony', y = 'Mean Individual ELPD', col = 'Data Colony') 
+  labs(x = 'Posterior Colony', y = 'Mean Individual ELPD', col = 'Data Colony') +
+  theme(strip.text = element_text(size = 13),
+        axis.title = element_text(size = 14),
+        legend.title = element_text(size = 13))
 
 ##### Figure 6 #####
 cps <- c('HA', 'TL', 'HL', 'TH', 'HH')
@@ -198,7 +206,8 @@ var.lst <- lapply(vars, function(v) {
 })
 cp.sw.ag <- bind_rows(var.lst)
 
-cp.sw.ag$province <- factor(cp.sw.ag$province, levels = prov.ord)
+cp.sw.ag$province <- factor(cp.sw.ag$province, levels = prov.ord,
+                            labels = prov.ord.lab.short)
 cp.sw.ag$var2 <- factor(factor(cp.sw.ag$variable), 
                         labels = c('`Multiplicative Intercept` ~~ (rho)', 
                                    '`Scale of Individual Variation` ~~ (sigma[epsilon])'))
@@ -241,7 +250,8 @@ ggplot(data = gc2) +
   theme_minimal() +
   scale_color_manual(values = cbPalette) +
   facet_wrap(vars(stage)) +
-  labs(x = 'Rearing Temperature', y = 'Development Rate', col = 'Colony') +
+  labs(x = expression('Rearing Temperature ' (degree~C)),
+       y = 'Development Rate', col = 'Colony') +
   theme(strip.text = element_text(size = 13),
         legend.title = element_text(size = 13),
         axis.title = element_text(size = 14),
