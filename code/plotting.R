@@ -170,6 +170,8 @@ c.post.l2 <- subset(c.post, stage == 'L2',
 
 c.post.l2 <- bind_rows(ps.df, c.post.l2)
 c.post.l2$province <- factor(c.post.l2$province, levels = c('Prior', prov.ord))
+c.post.l2$province <- factor(c.post.l2$province, levels = c('Prior', prov.ord),
+                             labels = c('Prior', prov.ord.lab.short))
 names(c.post.l2) <- c('H[A]', 'T[L]', 'H[L]', 'T[H]', 'H[H]', 'province')
 
 ggpairs(data = c.post.l2, columns = 1:5, 
