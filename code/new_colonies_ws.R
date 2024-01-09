@@ -14,6 +14,9 @@ weather$Temp <- pmin(pmax(weather$Temp, 0), 40)
 on.weather <- subset(weather, Location == 'ON' & Year == 2019)
 write.csv(on.weather, 'data/on_real_weather.csv', row.names = FALSE)
 
+in.weather <- subset(weather, Location == 'IN' & Year == 1997)
+write.csv(in.weather, 'data/in_real_weather.csv', row.names = FALSE)
+
 # ag.gc <- read.csv('code/output/ag_devcurves.csv')
 # ag.gc <- subset(ag.gc, select = -c(low, high))
 # names(ag.gc)[1] <- c('Temp')
@@ -61,6 +64,8 @@ dt.lst <- lapply(unique(mg$full.index), function(ind) {
 })
 age.df <- bind_rows(dt.lst)
 write.csv(age.df, 'code/output/sim_age.csv')
+ag.age.df <- aggregate(data = age.df, age ~ DATE + province + index + full.index, max)
+write.csv(ag.age.df, 'code/output/sim_age_daily.csv', row.names = FALSE)
 
 ##### Compare pupal dates #####
 p.lst <- lapply(unique(age.df$full.index), function(ind) {
