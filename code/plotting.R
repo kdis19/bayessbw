@@ -1,6 +1,7 @@
 library(tidyverse)
 library(GGally)
 library(lubridate)
+library(ggpubr)
 source('code/likelihood.R')
 
 prov.ord <- c('IPU', 'IN', 'AB', 'ON', 'QC', 'NB2')
@@ -260,12 +261,6 @@ ggplot(data = gc2) +
         legend.position = c(0.8, 0.28))
 
 ##### Figure 8 #####
-on.weather <- read.csv('data/on_real_weather.csv')
-on.weather$DATE <- as.Date(on.weather$DATE)
-on.weather$datetime <- on.weather$DATE + hours(on.weather$Hour)
-daily <- aggregate(data = on.weather, Temp.orig ~ DATE, mean)
-daily$DATE <- as.POSIXct(daily$DATE)
-
 pdates <- read.csv('code/output/pupal_dates.csv')
 pdates$province <- factor(pdates$province, levels = prov.ord,
                           labels = prov.ord.lab)
@@ -283,6 +278,91 @@ ggplot(data = pdates) +
   scale_color_manual(values = cbPalette) +
   scale_fill_manual(values = cbPalette)
   
+## Currently only have ON 2019 and IN 1997 ##
+wp.fun <- function(Province, year, tags = c('A', 'B', 'C')) {
+  province <- tolower(Province)
+  yr <- substr(as.character(year), 3, 4)
   
+  
+  on.weather <- read.csv(paste0('data/', province, yr, '_real_weather.csv'))
+  on.weather$DATE <- as.Date(on.weather$DATE)
+  on.weather$datetime <- on.weather$DATE + hours(on.weather$Hour)
+  on.weather <- subset(on.weather, between(Month, 4, 7))
+  
+  daily <- aggregate(data = on.weather, Temp ~ DATE, mean)
+  daily$DATE <- as.POSIXct(daily$DATE)
+  
+  on.ages.orig <- read.csv(paste0('code/output/weathersims/', Province, 
+                                  yr, '_sim_age.csv'))
+  on.ages.ag <- aggregate(data = on.ages.orig, age ~ DATE + province, 
+                          function(x) {quantile(x, probs = c(0.05, 0.25, 0.5, 
+                                                             0.75, 0.95))})
+  age.mat <- as.data.frame(on.ages.ag$age)
+  names(age.mat) <- c('lowest', 'low', 'mid', 'high', 'highest')
+  on.ages <- bind_cols(on.ages.ag[,c('DATE', 'province')], age.mat)
+  on.ages$DATE <- as.Date(on.ages$DATE)
+  on.ages <- subset(on.ages, between(month(DATE), 4, 7))
+  on.ages$province <- factor(on.ages$province, levels = prov.ord, 
+                             labels = prov.ord.lab.short)
+  
+  on19 <- ggplot(data = on.weather) +
+    geom_line(aes(x = datetime, y = Temp), alpha = 0.3) +
+    geom_line(data = daily, aes(x = DATE, y = Temp), linewidth = 1.5) +
+    theme_minimal() +
+    labs(x = 'Date', y = expression('Temperature ' (degree~C)),
+         tag = tags[1], title = paste0(Province, ' ', year)) +
+    theme(axis.title = element_text(size = 14),
+          plot.tag = element_text(size = 14),
+          axis.text = element_text(size = 12),
+          plot.title = element_text(size = 16, hjust = 0.5, face = 'bold')) +
+    ylim(c(0, 35))
+  
+  ages <- ggplot(data = on.ages) +
+    # geom_ribbon(aes(x = DATE, ymin = lowest, ymax = highest,
+    #                 fill = province), alpha = 0.3) +
+    geom_ribbon(aes(x = DATE, ymin = low, ymax = high,
+                    fill = province), alpha = 0.7) +
+    geom_line(aes(x = DATE, y = mid, col = province)) +
+    scale_fill_manual(values = cbPalette) +
+    scale_color_manual(values = cbPalette) +
+    scale_y_continuous(labels = c(paste0('L', 2:6), 'Pupa')) +
+    labs(col = 'Colony', fill = 'Colony', x = 'Date', 
+         y = 'Larval Stage', tag = tags[2]) +
+    theme_minimal() +
+    theme(axis.title = element_text(size = 14),
+          legend.title = element_text(size = 13),
+          legend.position = 'bottom',
+          plot.tag = element_text(size = 14),
+          axis.text = element_text(size = 12)) +
+    guides(col = guide_legend(nrow = 1),
+           fill = guide_legend(nrow = 1))
+  
+  pdates <- read.csv(paste0('code/output/weathersims/', Province, yr,
+                            '_pupal_dates.csv'))
+  pdates$province <- factor(pdates$province, levels = prov.ord,
+                            labels = prov.ord.lab)
+  
+  pdplot <- ggplot(data = pdates) +
+    geom_boxplot(aes(x = province, 
+                     y = days(pup.jd) + as.Date(paste0(year - 1, '-12-31')), 
+                     fill = province, col = province), 
+                 alpha = 0.5, linewidth = 1.5, size = 2) +
+    labs(x = 'Colony', y = 'Estimated Date of Pupation', tag = tags[3]) +
+    theme_minimal() +
+    theme(legend.position = 'none',
+          axis.title = element_text(size = 14),
+          axis.text.y = element_text(size = 12),
+          axis.text.x = element_text(size = 12, angle = 12),
+          plot.tag = element_text(size = 14)) +
+    scale_color_manual(values = cbPalette) +
+    scale_fill_manual(values = cbPalette)
+  
+  return(list(on19, ages, pdplot))
+}
 
+on.lst <- wp.fun('ON', 2019, tags = c('A', 'C'))
+in.lst <- wp.fun('IN', 1997, tags = c('B', 'D'))
 
+ggarrange(on.lst[[1]], in.lst[[1]], on.lst[[2]], in.lst[[2]],
+          nrow = 2, ncol = 2, heights = c(0.3, 0.7), 
+          common.legend = TRUE, legend = 'bottom')

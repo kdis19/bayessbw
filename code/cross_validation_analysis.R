@@ -198,3 +198,26 @@ names(elpd.df) <- c('mean', 'se')
 elpd.temp.df <- bind_cols(ag2.pdf[,1:3], elpd.df)
 write.csv(elpd.temp.df, 'code/output/cv/elpd_temp.csv', row.names = FALSE)
 
+##### Paired Comparison #####
+paired.p.lst <- lapply(provs, function(p) {
+  sub <- subset(ag.pdf, prov.orig == p)
+  elpd.orig.df <- subset(sub, prov.comp == p)
+  elpd.orig.df <- elpd.orig.df[order(elpd.orig.df$index),]
+  elpd.orig <- elpd.orig.df$elpd
+  provs2 <- provs[which(provs != p)]
+  lst2 <- lapply(provs2, function(p2) {
+    sub2 <- subset(sub, prov.comp == p2)
+    sub2 <- sub2[order(sub2$index),]
+    elpd.comp <- sub2$elpd
+    paired.mean <- mean(elpd.orig - elpd.comp)
+    paired.se <- sqrt(var(elpd.orig - elpd.comp)/length(elpd.orig))
+    df <- data.frame('prov.data' = p,
+                     'prov.post' = p2,
+                     'mean' = paired.mean,
+                     'se' = paired.se)
+    return(df)
+  })
+  df2 <- bind_rows(lst2)
+  return(df2)
+})
+paired.p <- bind_rows(paired.p.lst)
