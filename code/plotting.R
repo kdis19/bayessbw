@@ -331,11 +331,12 @@ wp.fun <- function(Province, year, tags = c('A', 'B', 'C')) {
     theme_minimal() +
     theme(axis.title = element_text(size = 14),
           legend.title = element_text(size = 13),
-          legend.position = 'bottom',
+          #legend.position = 'bottom',
+          legend.position = 'none',
           plot.tag = element_text(size = 14),
-          axis.text = element_text(size = 12)) +
-    guides(col = guide_legend(nrow = 1),
-           fill = guide_legend(nrow = 1))
+          axis.text = element_text(size = 12)) #+
+    # guides(col = guide_legend(nrow = 1),
+    #        fill = guide_legend(nrow = 1))
   
   pdates <- read.csv(paste0('code/output/weathersims/', Province, yr,
                             '_pupal_dates.csv'))
