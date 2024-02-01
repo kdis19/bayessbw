@@ -147,9 +147,11 @@ ggplot(data = s.all.df) +
         axis.title = element_text(size = 14))
 
 ggplot(data = elpd.temp.df) +
-  geom_line(data = self.df, aes(x = temp, y = mean, col = prov.orig), show.legend = FALSE) +
+  geom_line(data = self.df, aes(x = temp, y = mean, col = prov.orig), 
+            show.legend = FALSE) +
   geom_point(aes(x = temp, y = mean, col = prov.comp), size = 2) +
-  geom_segment(aes(x = temp, xend = temp, y = mean - se, yend = mean + se, col = prov.comp)) +
+  geom_segment(aes(x = temp, xend = temp, y = mean - se, yend = mean + se, 
+                   col = prov.comp)) +
   facet_wrap(vars(prov.orig)) +
   scale_color_manual(values = cbPalette) +
   theme_minimal() +
@@ -211,9 +213,10 @@ cp.sw.ag <- bind_rows(var.lst)
 
 cp.sw.ag$province <- factor(cp.sw.ag$province, levels = prov.ord,
                             labels = prov.ord.lab.short)
+v2labs <- c('`Multiplicative Intercept` ~~ (rho)', 
+            '`Scale of Individual Variation` ~~ (sigma[epsilon])')
 cp.sw.ag$var2 <- factor(factor(cp.sw.ag$variable), 
-                        labels = c('`Multiplicative Intercept` ~~ (rho)', 
-                                   '`Scale of Individual Variation` ~~ (sigma[epsilon])'))
+                        labels = v2labs)
 
 
 ggplot(data = cp.sw.ag) +
@@ -348,7 +351,7 @@ wp.fun <- function(Province, year, tags = c('A', 'B', 'C')) {
                      y = days(pup.jd) + as.Date(paste0(year - 1, '-12-31')), 
                      fill = province, col = province), 
                  alpha = 0.5, linewidth = 1.5, size = 2) +
-    labs(x = 'Colony', y = 'Estimated Date of Pupation', tag = tags[3]) +
+    labs(x = 'Colony', y = 'Pupation Date', tag = tags[3]) +
     theme_minimal() +
     theme(legend.position = 'none',
           axis.title = element_text(size = 14),
