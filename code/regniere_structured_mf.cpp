@@ -69,6 +69,7 @@ px[0] = DW * py[0];
     DATA_VECTOR(time2d);
     DATA_VECTOR(time1d);
     DATA_INTEGER(use_prior);
+    DATA_IVECTOR(sex);
     
     PARAMETER(HA);
     PARAMETER(TL);
@@ -79,6 +80,7 @@ px[0] = DW * py[0];
     PARAMETER_VECTOR(s_eps);
     PARAMETER_VECTOR(s_upsilon);
     PARAMETER_VECTOR(upsilon);
+    PARAMETER(male_l6);
     
     
     Type jnll = 0;
@@ -104,8 +106,8 @@ px[0] = DW * py[0];
       tpred1 = calc_pred(temp1(i), rho(stage(i)), HA, TL, -HL, TH, HH, TA);
       tpred2 = calc_pred(temp2(i), rho(stage(i)), HA, TL, -HL, TH, HH, TA);
       
-      c_upsilon1 = exp(upsilon(t_block1(i))*s_upsilon(stage(i)));
-      c_upsilon2 = exp(upsilon(t_block2(i))*s_upsilon(stage(i)));
+      c_upsilon1 = exp(upsilon(t_block1(i))*s_upsilon(stage(i)) - sex(i)*male_l6);
+      c_upsilon2 = exp(upsilon(t_block2(i))*s_upsilon(stage(i)) - sex(i)*male_l6);
       
       // Transform for bias reduction
       tpred1 *= c_upsilon1;
@@ -159,6 +161,8 @@ px[0] = DW * py[0];
       
       jnll -= sum(dnorm(log(s_eps), Type(-1.5), Type(0.1), 1));
       jnll -= sum(dnorm(log(s_upsilon), Type(-2.5), Type(0.05), 1));
+      
+      jnll -= dgamma(male_l6, Type(3.25), Type(0.05), 1);
     }
     return jnll;
     

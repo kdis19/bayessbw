@@ -3,7 +3,8 @@ library(TMB)
 library(tidyverse)
 library(lme4)
 
-source('code/likelihood.R')
+source('code/functions.R')
+source('code/function_cor_mf.R')
 nList <- lme4:::namedList
 
 all.days.df.ind <- read.csv('data/all_days_df_ind.csv')
@@ -22,10 +23,12 @@ data.lst <- lapply(provs, function(p) {
   return(da)
 })
 data.df <- bind_rows(data.lst)
-data.df$sex <- sapply(data.df$index, function(x) {
+data.df$sexname <- sapply(data.df$index, function(x) {
   strsplit(x, split = '_')[[1]][3]
 })
-data.df <- subset(data.df, select = -index)
+data.df$sex <- as.numeric(factor(data.df$sexname)) - 1
+
+data.df <- subset(data.df, select = -c(index, sexname))
 
 ##### Run model #####
 basename <- "regniere_structured_mf"
@@ -43,47 +46,22 @@ parms <- list(
   'TL' = 285.90432,
   'TH' = 306.47530,
   's_eps' = rep(0.3, 5),
-  's_upsilon' = rep(0.08, 5))
+  's_upsilon' = rep(0.08, 5),
+  'male_l6' = 0.2)
 parms1 <- parms
 diagnostics <- list()
 chains <- 4
 parm.lst <- prior.samp(chains)
 
 p <- 'ON'
-parms <- parms1
-all.data <- subset(all.days.df, province == p & generation == 'F1')
+dd.orig <- subset(data.df, province == 'ON', select = -province)
+dd <- dd.orig
 
-all.data$block <- paste(all.data$stage, all.data$temp1, sep = '_')
-lev.ord <- paste(rep(stages, each = 7), rep(seq(5, 35, by = 5), 5), sep = '_')
-all.data$block <- factor(all.data$block)
-all.data$block <- factor(all.data$block, levels = lev.ord)
-w1 <- which(all.data$temp1 %in% c(15, 20, 25) & all.data$time2 == 0)
-all.data$time2[w1] <- 1
-w2 <- which(all.data$temp1 %in% c(5, 10, 30, 35) & all.data$time1 == 0)
-all.data$time1[w2] <- 1
+dd$sex[dd$stage != 4] <- 0
+dd.ag <- aggregate(data = dd, nobs ~ ., sum)
 
-all.data$time1.orig <- all.data$time1
-all.data$time2.orig <- all.data$time2
+dd2 <- as.list(dd.ag)
 
-all.data$l2 <- sapply(all.data$stage, function(x) {ifelse(x == 'L2', 1, 0)})
-all.data$cur0 <- sapply(all.data$time2.orig, function(x) {ifelse(x == 0, 1, 0)})
-all.data$prev0 <- c(0, all.data$cur0[1:(nrow(all.data) - 1)])
-
-all.data$time1 <- all.data$time1.orig + (1-all.data$l2)*all.data$prev0
-all.data$time2 <- all.data$time2.orig + (1-all.data$l2)*(1-all.data$prev0)
-all.data$time1d <- all.data$time1.orig - all.data$cur0
-all.data$time2d <- all.data$time2.orig - (1 - all.data$cur0)
-all.data <- subset(all.data, select = c(nobs, temp1, temp2, stage, time1, 
-                                        time2, time1d, time2d, block))
-
-dd <- all.data
-dd$stagename <- dd$stage
-dd$stage <- as.numeric(factor(dd$stage)) - 1
-
-dd2 <- with(dd, nList(temp1,time1,temp2,time2,time1d,time2d,stage,
-                      nobs=as.integer(nobs)))
-dd2$t_block1 <- dd2$stage*7 + dd2$temp1/5 - 1
-dd2$t_block2 <- dd2$stage*7 + dd2$temp2/5 - 1
 dd2$use_prior <- 1
 sm1 <- 0:4
 dd2$k_vec <- -1.05*sm1^2 + 4.22*sm1 + 4.08
@@ -96,6 +74,7 @@ parms$upsilon <- rep(0, nblock)
 pnames <- c("rho",
             "HA","TL","HL","TH","HH",
             "s_eps", 's_upsilon', 
+            "male_l6",
             'upsilon')
 ff <- MakeADFun(data=dd2,
                 parameters=as.list(parms[pnames]),
@@ -149,7 +128,7 @@ d.post.lst <- lapply(pnames, function(nm) {
   return(as.data.frame(new))
 })
 d.post.df <- bind_cols(d.post.lst)
-names(d.post.df)[1:8] <- pnames[1:8]
+names(d.post.df)[1:9] <- pnames[1:9]
 write.csv(d.post.df, 'data/noss_model_results.csv', row.names = FALSE)
 
 ##### Perform power transformations on \sigma_{\epsilon}, if desired #####
